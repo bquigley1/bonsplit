@@ -32,6 +32,7 @@ final class TabBarItemGeometryRegistry {
     private var liveScrollObserver: NSObjectProtocol?
     private var documentFrameObserver: NSObjectProtocol?
     private var documentBoundsObserver: NSObjectProtocol?
+    private var scrollWheelMonitor: Any?
     private var selectedTabId: UUID?
     private var lastObservedSelectedTabDocumentFrame: CGRect?
     private var pendingScrollIntent: ScrollIntent?
@@ -50,6 +51,9 @@ final class TabBarItemGeometryRegistry {
         }
         if let documentBoundsObserver {
             NotificationCenter.default.removeObserver(documentBoundsObserver)
+        }
+        if let scrollWheelMonitor {
+            NSEvent.removeMonitor(scrollWheelMonitor)
         }
     }
 
@@ -99,9 +103,11 @@ final class TabBarItemGeometryRegistry {
         self.scrollView = scrollView
         makeScrollStackTransparent(scrollView)
         guard let clipView = scrollView?.contentView else {
+            removeScrollWheelMonitor()
             invalidateObservers()
             return
         }
+        installScrollWheelMonitor()
 
         // Keep the documented AppKit scroll signal outside SwiftUI so chrome
         // redraws do not publish geometry into the view graph.
@@ -179,6 +185,66 @@ final class TabBarItemGeometryRegistry {
         let maximumOffset = max(0, metrics.documentWidth - metrics.viewportWidth)
         let clampedOffset = min(max(metrics.offset, 0), maximumOffset)
         setHorizontalOffset(clampedOffset, metrics: metrics)
+    }
+
+    /// Scrolls an overflowing strip horizontally for a vertical mouse wheel
+    /// event over it. The strip only scrolls horizontally, so AppKit drops
+    /// those deltas and overflowed tabs would stay unreachable with a mouse.
+    /// Trackpad (precise) and horizontal deltas keep their native handling.
+    /// Returns whether the event was consumed.
+    @discardableResult
+    func scrollHorizontallyForMouseWheel(
+        deltaX: CGFloat,
+        deltaY: CGFloat,
+        hasPreciseScrollingDeltas: Bool,
+        locationInWindow: NSPoint,
+        window: NSWindow?
+    ) -> Bool {
+        guard !hasPreciseScrollingDeltas,
+              abs(deltaY) > abs(deltaX),
+              let scrollView,
+              let window,
+              scrollView.window === window,
+              isVisibleInHierarchy(scrollView),
+              scrollView.visibleRect.contains(scrollView.convert(locationInWindow, from: nil)),
+              let metrics = currentScrollMetrics(),
+              metrics.documentWidth - metrics.viewportWidth > 0.5 else {
+            return false
+        }
+
+        // Wheel down (negative delta) moves toward the trailing tabs, like
+        // it moves down a vertical list.
+        userWillScroll()
+        setHorizontalOffset(
+            metrics.offset - deltaY * TabBarItemGeometryRegistry.mouseWheelLineWidth,
+            metrics: metrics
+        )
+        return true
+    }
+
+    private static let mouseWheelLineWidth: CGFloat = 40
+
+    private func installScrollWheelMonitor() {
+        guard scrollWheelMonitor == nil else { return }
+        scrollWheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self else { return event }
+            let consumed = MainActor.assumeIsolated {
+                self.scrollHorizontallyForMouseWheel(
+                    deltaX: event.scrollingDeltaX,
+                    deltaY: event.scrollingDeltaY,
+                    hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas,
+                    locationInWindow: event.locationInWindow,
+                    window: event.window
+                )
+            }
+            return consumed ? nil : event
+        }
+    }
+
+    private func removeScrollWheelMonitor() {
+        guard let scrollWheelMonitor else { return }
+        NSEvent.removeMonitor(scrollWheelMonitor)
+        self.scrollWheelMonitor = nil
     }
 
     func frame(for tabId: UUID, in targetView: NSView) -> CGRect? {
