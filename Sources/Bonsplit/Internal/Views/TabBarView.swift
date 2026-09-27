@@ -271,6 +271,13 @@ enum TabBarStyling {
         return (left: left, right: right)
     }
 
+    /// Whether the split buttons stay hidden until the pointer is over the tab
+    /// bar. Minimal mode always hides them; hosts can opt in elsewhere through
+    /// ``BonsplitConfiguration/Appearance/splitButtonsOnHover``.
+    static func hidesSplitButtonsUntilHover(isMinimalMode: Bool, splitButtonsOnHover: Bool) -> Bool {
+        isMinimalMode || splitButtonsOnHover
+    }
+
     static func trailingTabContentInset(
         showSplitButtons: Bool,
         isMinimalMode: Bool,
@@ -895,7 +902,7 @@ struct TabBarView: View {
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
             splitButtonCount: visibleSplitButtons.count,
             splitButtonLaneVisible: shouldShowSplitButtons,
-            reservesSplitButtonLane: showSplitButtons && !isMinimalMode,
+            reservesSplitButtonLane: showSplitButtons && !hidesSplitButtonsUntilHover,
             measuredSplitButtonLaneWidth: measuredSplitButtonLaneWidth
         )
     }
@@ -920,7 +927,16 @@ struct TabBarView: View {
     }
 
     private var shouldShowSplitButtons: Bool {
-        shouldRenderSplitButtons && (!isMinimalMode || isHoveringTabBar)
+        shouldRenderSplitButtons && (!hidesSplitButtonsUntilHover || isHoveringTabBar)
+    }
+
+    /// Hover-only split buttons fade in as an overlay and reserve no lane, so
+    /// the tabs keep the full bar width while the buttons are hidden.
+    private var hidesSplitButtonsUntilHover: Bool {
+        TabBarStyling.hidesSplitButtonsUntilHover(
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: appearance.splitButtonsOnHover
+        )
     }
 
     private var splitButtonsBackdropWidth: CGFloat {

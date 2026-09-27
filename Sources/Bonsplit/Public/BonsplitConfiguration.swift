@@ -578,7 +578,9 @@ extension BonsplitConfiguration {
             }
         }
 
-        /// When true, split buttons are only visible on hover
+        /// When true, split buttons are only visible while the pointer is over the
+        /// tab bar. They fade in as an overlay instead of reserving a lane, the
+        /// same way they behave in minimal mode.
         public var splitButtonsOnHover: Bool
 
         /// Optional explicit backdrop style for the tab bar's right-side action buttons.

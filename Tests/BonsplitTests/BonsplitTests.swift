@@ -576,6 +576,13 @@ final class BonsplitTests: XCTestCase {
         )
     }
 
+    func testSplitButtonsOnHoverHidesSplitButtonsOutsideMinimalMode() {
+        XCTAssertFalse(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: false, splitButtonsOnHover: false))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: false, splitButtonsOnHover: true))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: true, splitButtonsOnHover: false))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: true, splitButtonsOnHover: true))
+    }
+
     func testTabBarLayoutKeepsDefaultSplitButtonLaneWidthAsMinimum() {
         let compactMeasuredWidth =
             TabBarStyling.splitButtonsLeadingPadding
