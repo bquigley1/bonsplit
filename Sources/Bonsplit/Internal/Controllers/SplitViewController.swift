@@ -507,6 +507,63 @@ final class SplitViewController {
         }
     }
 
+    // MARK: - Auto Layout
+
+    /// Adds a pane holding `tab` and arranges every pane in Zellij's default
+    /// tiled swap layout, the layout cmux-tui's Alt-n reproduces. Panes keep
+    /// their identity and tabs; only the split structure is rebuilt, so
+    /// manual divider positions are replaced by equal sizes.
+    @discardableResult
+    func insertPaneWithAutoLayout(tab: TabItem) -> PaneID {
+        clearPaneZoom()
+        let newPane = PaneState(tabs: [tab])
+        let existingPanes = rootNode.allPanes.enumerated().sorted { a, b in
+            let aOrdinal = paneCreationOrdinal[a.element.id] ?? UInt64(a.offset)
+            let bOrdinal = paneCreationOrdinal[b.element.id] ?? UInt64(b.offset)
+            return aOrdinal < bOrdinal
+        }.map(\.element)
+        registerPane(newPane)
+        rootNode = Self.autoLayoutRoot(for: existingPanes + [newPane])
+        focusedPaneId = newPane.id
+        return newPane.id
+    }
+
+    /// Column sizes of Zellij's default `vertical` swap layout for `count`
+    /// panes in creation order. Up to five panes, the first pane keeps the
+    /// left column and the rest share a column. Beyond that, columns hold
+    /// four panes and the first column takes the remainder, so every new
+    /// pane fills the right column before another column opens.
+    static func autoLayoutColumnSizes(paneCount count: Int) -> [Int] {
+        guard count > 1 else { return count == 1 ? [1] : [] }
+        if count <= 5 { return [1, count - 1] }
+        let remainder = count % 4
+        let first = remainder == 0 ? 4 : remainder
+        return [first] + Array(repeating: 4, count: (count - first) / 4)
+    }
+
+    private static func autoLayoutRoot(for panes: [PaneState]) -> SplitNode {
+        var columns: [SplitNode] = []
+        var start = 0
+        for size in autoLayoutColumnSizes(paneCount: panes.count) {
+            let column = panes[start..<(start + size)].map { SplitNode.pane($0) }
+            columns.append(equalSplit(column, orientation: .vertical))
+            start += size
+        }
+        return equalSplit(columns, orientation: .horizontal)
+    }
+
+    /// Chains `nodes` into splits whose divider positions give every node the
+    /// same share of the axis.
+    private static func equalSplit(_ nodes: [SplitNode], orientation: SplitOrientation) -> SplitNode {
+        guard nodes.count > 1 else { return nodes[0] }
+        return .split(SplitState(
+            orientation: orientation,
+            first: nodes[0],
+            second: equalSplit(Array(nodes.dropFirst()), orientation: orientation),
+            dividerPosition: 1 / CGFloat(nodes.count)
+        ))
+    }
+
     private func normalizedInitialDividerPosition(_ position: CGFloat?) -> CGFloat {
         guard let position else { return 0.5 }
         return min(max(position, 0), 1)
