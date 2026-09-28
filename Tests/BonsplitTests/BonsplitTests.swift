@@ -583,6 +583,36 @@ final class BonsplitTests: XCTestCase {
         XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: true, splitButtonsOnHover: true))
     }
 
+    func testSplitButtonsOnHoverDrivesVisibilityAndLaneReservation() {
+        func lane(minimal: Bool, onHover: Bool, hovering: Bool) -> (visible: Bool, reservesLane: Bool) {
+            TabBarStyling.splitButtonLane(
+                showSplitButtons: true,
+                buttonCount: 3,
+                isMinimalMode: minimal,
+                splitButtonsOnHover: onHover,
+                isHoveringTabBar: hovering
+            )
+        }
+
+        // Standard mode without the option: always visible, lane reserved.
+        XCTAssertTrue(lane(minimal: false, onHover: false, hovering: false) == (true, true))
+        // Standard mode with the option: hidden until hover, never reserves a lane.
+        XCTAssertTrue(lane(minimal: false, onHover: true, hovering: false) == (false, false))
+        XCTAssertTrue(lane(minimal: false, onHover: true, hovering: true) == (true, false))
+        // Minimal mode behaves the same regardless of the option.
+        XCTAssertTrue(lane(minimal: true, onHover: false, hovering: false) == (false, false))
+        XCTAssertTrue(lane(minimal: true, onHover: false, hovering: true) == (true, false))
+
+        let hidden = TabBarStyling.splitButtonLane(
+            showSplitButtons: false,
+            buttonCount: 3,
+            isMinimalMode: false,
+            splitButtonsOnHover: true,
+            isHoveringTabBar: true
+        )
+        XCTAssertTrue(hidden == (false, false))
+    }
+
     func testTabBarLayoutKeepsDefaultSplitButtonLaneWidthAsMinimum() {
         let compactMeasuredWidth =
             TabBarStyling.splitButtonsLeadingPadding

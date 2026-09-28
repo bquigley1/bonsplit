@@ -278,6 +278,27 @@ enum TabBarStyling {
         isMinimalMode || splitButtonsOnHover
     }
 
+    /// Whether the split buttons are visible and whether they reserve a lane in
+    /// the tab row. Hover-only buttons fade in as an overlay and reserve no lane,
+    /// so the tabs keep the full bar width while the buttons are hidden.
+    static func splitButtonLane(
+        showSplitButtons: Bool,
+        buttonCount: Int,
+        isMinimalMode: Bool,
+        splitButtonsOnHover: Bool,
+        isHoveringTabBar: Bool
+    ) -> (visible: Bool, reservesLane: Bool) {
+        let hidesUntilHover = hidesSplitButtonsUntilHover(
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: splitButtonsOnHover
+        )
+        let renders = showSplitButtons && buttonCount > 0
+        return (
+            visible: renders && (!hidesUntilHover || isHoveringTabBar),
+            reservesLane: showSplitButtons && !hidesUntilHover
+        )
+    }
+
     static func trailingTabContentInset(
         showSplitButtons: Bool,
         isMinimalMode: Bool,
@@ -902,7 +923,7 @@ struct TabBarView: View {
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
             splitButtonCount: visibleSplitButtons.count,
             splitButtonLaneVisible: shouldShowSplitButtons,
-            reservesSplitButtonLane: showSplitButtons && !hidesSplitButtonsUntilHover,
+            reservesSplitButtonLane: splitButtonLane.reservesLane,
             measuredSplitButtonLaneWidth: measuredSplitButtonLaneWidth
         )
     }
@@ -927,15 +948,16 @@ struct TabBarView: View {
     }
 
     private var shouldShowSplitButtons: Bool {
-        shouldRenderSplitButtons && (!hidesSplitButtonsUntilHover || isHoveringTabBar)
+        splitButtonLane.visible
     }
 
-    /// Hover-only split buttons fade in as an overlay and reserve no lane, so
-    /// the tabs keep the full bar width while the buttons are hidden.
-    private var hidesSplitButtonsUntilHover: Bool {
-        TabBarStyling.hidesSplitButtonsUntilHover(
+    private var splitButtonLane: (visible: Bool, reservesLane: Bool) {
+        TabBarStyling.splitButtonLane(
+            showSplitButtons: showSplitButtons,
+            buttonCount: visibleSplitButtons.count,
             isMinimalMode: isMinimalMode,
-            splitButtonsOnHover: appearance.splitButtonsOnHover
+            splitButtonsOnHover: appearance.splitButtonsOnHover,
+            isHoveringTabBar: isHoveringTabBar
         )
     }
 
