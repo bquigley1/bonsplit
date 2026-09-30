@@ -1,7 +1,9 @@
 import AppKit
 
 /// Neutral colors for chrome drawn on a themed surface: the shared-terminal
-/// presence accessory on a tab, and hosts' sizing bounds on a pane. Every
+/// presence accessory on a tab and the host's size panel avatars, plus the
+/// chip text of the pane's sizing bounds (whose lines use the split divider
+/// color, see ``BonsplitSizingChromePalette``). Every
 /// role derives from the actual surface (``background``) and its text color
 /// (``foreground``), with contrast floors that hold on any theme.
 public struct BonsplitContrastPalette: Equatable, Sendable {
