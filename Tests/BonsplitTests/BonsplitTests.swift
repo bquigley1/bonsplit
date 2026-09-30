@@ -2073,6 +2073,41 @@ final class BonsplitTests: XCTestCase {
     }
 
     @MainActor
+    func testTabContextMenuDisablesCloseTabWhenClosingIsDisabled() throws {
+        let state = TabContextMenuState(
+            isPinned: false,
+            canCloseTab: false,
+            isUnread: false,
+            isBrowser: false,
+            isAudioMuted: false,
+            isTerminal: true,
+            hasCustomTitle: false,
+            canCloseToLeft: false,
+            canCloseToRight: false,
+            canCloseOthers: false,
+            canMoveToNewWorkspace: false,
+            canMoveToLeftPane: false,
+            canMoveToRightPane: false,
+            forkConversationDefaultAction: .forkConversationRight,
+            isZoomed: false,
+            hasSplits: false,
+            shortcuts: [:]
+        )
+        let menu = TabContextMenuBuilder.makeMenu(
+            snapshot: TabContextMenuSnapshot(
+                tabId: UUID(),
+                state: state,
+                moveDestinationsProvider: { [] },
+                forkConversationAvailabilityProvider: { .hidden }
+            ),
+            target: TabContextMenuActionTarget()
+        )
+
+        let closeItem = try XCTUnwrap(menu.items.first { $0.title == "Close Tab" })
+        XCTAssertFalse(closeItem.isEnabled)
+    }
+
+    @MainActor
     func testBrowserTabContextMenuCreatesAudioMuteToggle() throws {
         let target = TabContextMenuActionTarget()
         var selectedAction: TabContextAction?
@@ -5035,10 +5070,11 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSplitButtonLaneTopSaturation() -> CGFloat? {
         let buttonCount = BonsplitConfiguration.SplitActionButton.defaults.count
-        let size = NSSize(width: 240, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#111111",
@@ -5055,7 +5091,7 @@ final class BonsplitTests: XCTestCase {
             size: size,
             configurePane: { pane in
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the controls",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [selected]
@@ -5070,9 +5106,10 @@ final class BonsplitTests: XCTestCase {
 
     @MainActor
     private func renderedSplitButtonBackdropFadeVerticalColorDelta() -> CGFloat? {
-        let size = NSSize(width: 360, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#000000",
@@ -5115,10 +5152,11 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSplitButtonLaneSolidBackdropBrightness() -> CGFloat? {
         let buttonCount = BonsplitConfiguration.SplitActionButton.defaults.count
-        let size = NSSize(width: 240, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#000000",
@@ -5153,11 +5191,12 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSplitButtonContentFadeStartBackdropBrightness() -> CGFloat? {
         let buttonCount = BonsplitConfiguration.SplitActionButton.defaults.count
-        let size = NSSize(width: 240, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let contentFadeWidth = BonsplitConfiguration.Appearance.SplitButtonBackdropEffect.default.contentFadeWidth
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#000000",
@@ -5174,7 +5213,7 @@ final class BonsplitTests: XCTestCase {
             size: size,
             configurePane: { pane in
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the controls",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [selected]
@@ -5195,11 +5234,12 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSplitButtonContentFadeStartSaturation() -> CGFloat? {
         let buttonCount = BonsplitConfiguration.SplitActionButton.defaults.count
-        let size = NSSize(width: 240, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let contentFadeWidth = BonsplitConfiguration.Appearance.SplitButtonBackdropEffect.default.contentFadeWidth
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#000000",
@@ -5216,7 +5256,7 @@ final class BonsplitTests: XCTestCase {
             size: size,
             configurePane: { pane in
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the controls",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [selected]
@@ -5237,11 +5277,12 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSelectedIndicatorBackdropBrightnesses() -> (leading: CGFloat, trailing: CGFloat)? {
         let buttonCount = BonsplitConfiguration.SplitActionButton.defaults.count
-        let size = NSSize(width: 240, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let fadeWidth = BonsplitConfiguration.Appearance.SplitButtonBackdropEffect.default.contentFadeWidth
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
+            tabMaxWidth: size.width,
             splitButtonBackdropEffect: .default,
             chromeColors: .init(
                 backgroundHex: "#000000",
@@ -5258,7 +5299,7 @@ final class BonsplitTests: XCTestCase {
             size: size,
             configurePane: { pane in
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the controls",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [selected]
@@ -5287,11 +5328,12 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedSharedBackdropActionLaneSurfaceAlpha() -> CGFloat? {
         let buttonCount = 28
-        let size = NSSize(width: 360, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let appearance = sharedBackdropManyActionAppearance(
             tabBarHeight: size.height,
-            buttonCount: buttonCount
+            buttonCount: buttonCount,
+            tabMaxWidth: size.width
         )
 
         return renderedTabBarValue(
@@ -5302,7 +5344,7 @@ final class BonsplitTests: XCTestCase {
             configurePane: { pane in
                 let leading = TabItem(title: "", icon: nil)
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the full action button lane",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [leading, selected]
@@ -5323,7 +5365,7 @@ final class BonsplitTests: XCTestCase {
     @MainActor
     private func renderedEscapedSplitButtonBrightnessOutsideActionLane() -> CGFloat? {
         let buttonCount = 28
-        let size = NSSize(width: 360, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let appearance = BonsplitConfiguration.Appearance(
             tabBarHeight: size.height,
@@ -5381,7 +5423,7 @@ final class BonsplitTests: XCTestCase {
         solid: CGFloat
     )? {
         let buttonCount = 28
-        let size = NSSize(width: 360, height: 28)
+        let size = NSSize(width: Self.fullActionLaneWidth, height: 28)
         let splitButtonLaneWidth = visibleSplitButtonLaneWidth(size: size, buttonCount: buttonCount)
         let separatorFadeWidth: CGFloat = 99.75
         let rampStartFraction: CGFloat = 0.60
@@ -5405,7 +5447,7 @@ final class BonsplitTests: XCTestCase {
             configurePane: { pane in
                 let leading = TabItem(title: "", icon: nil)
                 let selected = TabItem(
-                    title: "selected tab title that reaches under the full action button lane",
+                    title: Self.fullActionLaneTitle,
                     icon: nil
                 )
                 pane.tabs = [leading, selected]
@@ -5498,8 +5540,25 @@ final class BonsplitTests: XCTestCase {
         }
     }
 
+    /// A tab bar wide enough to show the full action lane. Below
+    /// TabBarStyling.narrowPaneThreshold the tab bar collapses its actions into
+    /// one overflow button, so a test that samples the full lane's chrome must
+    /// render at least this wide.
+    private static let fullActionLaneWidth: CGFloat = TabBarStyling.narrowPaneThreshold + 80
+
+    /// A selected-tab title long enough that its tab, capped at the bar's
+    /// width, reaches under the full action lane.
+    private static let fullActionLaneTitle = String(
+        repeating: "selected tab title that reaches under the action lane ",
+        count: 3
+    )
+
     private func visibleSplitButtonLaneWidth(size: NSSize, buttonCount: Int) -> CGFloat {
-        TabBarLayout(
+        XCTAssertFalse(
+            TabBarStyling.isNarrowPane(width: size.width),
+            "A \(size.width)pt tab bar collapses its actions into one button; render at least fullActionLaneWidth to sample the full lane."
+        )
+        return TabBarLayout(
             tabBarHeight: size.height,
             availableWidth: size.width,
             splitButtonCount: buttonCount,

@@ -332,6 +332,7 @@ struct TabItemView: View {
     let showsControlShortcutHint: Bool
     let shortcutModifierSymbol: String
     let allowsClose: Bool
+    let middleClickCapture: ((@escaping () -> Void) -> AnyView)?
     let allowsContextMenu: Bool
     let contextMenuState: TabContextMenuState
     let moveDestinationsProvider: () -> [TabContextMoveDestination]
@@ -391,11 +392,16 @@ struct TabItemView: View {
         .tabControlShortcutHintVisibilityAnimation(value: showsShortcutHint)
         .contentShape(Rectangle().inset(by: -BonsplitTabItemHitTesting.horizontalSlop))
         // Middle click to close (macOS convention).
-        // Uses an AppKit event monitor so it doesn't interfere with left click selection or drag/reorder.
-        .background(MiddleClickMonitorView(onMiddleClick: {
-            guard allowsClose, !tab.isPinned else { return }
-            onClose(.middleClick)
-        }))
+        // The host capture view intercepts mouse-down on this tab without
+        // interfering with left-click selection or drag/reorder.
+        .background {
+            if let middleClickCapture {
+                middleClickCapture {
+                    guard allowsClose, !tab.isPinned else { return }
+                    onClose(.middleClick)
+                }
+            }
+        }
         .background {
             if allowsContextMenu {
                 TabContextMenuPresenter(
@@ -1431,54 +1437,6 @@ private struct FaviconIconView: NSViewRepresentable {
     }
 }
 
-private struct MiddleClickMonitorView: NSViewRepresentable {
-    let onMiddleClick: () -> Void
-
-    final class Coordinator {
-        var onMiddleClick: (() -> Void)?
-        weak var view: NSView?
-        var monitor: Any?
-
-        deinit {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-            }
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.clear.cgColor
-
-        context.coordinator.view = view
-        context.coordinator.onMiddleClick = onMiddleClick
-
-        // Monitor only middle clicks so we don't break drag/reorder or normal selection.
-        let coordinator = context.coordinator
-        coordinator.monitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseUp]) { [weak coordinator] event in
-            guard event.buttonNumber == 2 else { return event }
-            guard let coordinator, let v = coordinator.view, let w = v.window else { return event }
-            guard event.window === w else { return event }
-
-            let p = v.convert(event.locationInWindow, from: nil)
-            guard v.bounds.contains(p) else { return event }
-
-            coordinator.onMiddleClick?()
-            return nil // swallow so it doesn't also select the tab
-        }
-
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.view = nsView
-        context.coordinator.onMiddleClick = onMiddleClick
-    }
-}
-
 @MainActor
 enum TabContextMenuBuilder {
     private static let forkConversationSeparatorIdentifier = NSUserInterfaceItemIdentifier(
@@ -1530,7 +1488,7 @@ enum TabContextMenuBuilder {
         addAction(
             title: localized("tabContext.closeTab", defaultValue: "Close Tab"),
             action: .close,
-            enabled: !state.isPinned,
+            enabled: state.canCloseTab,
             state: state,
             target: target,
             to: menu
