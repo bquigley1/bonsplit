@@ -271,6 +271,34 @@ enum TabBarStyling {
         return (left: left, right: right)
     }
 
+    /// Whether the split buttons stay hidden until the pointer is over the tab
+    /// bar. Minimal mode always hides them; hosts can opt in elsewhere through
+    /// ``BonsplitConfiguration/Appearance/splitButtonsOnHover``.
+    static func hidesSplitButtonsUntilHover(isMinimalMode: Bool, splitButtonsOnHover: Bool) -> Bool {
+        isMinimalMode || splitButtonsOnHover
+    }
+
+    /// Whether the split buttons are visible and whether they reserve a lane in
+    /// the tab row. Hover-only buttons fade in as an overlay and reserve no lane,
+    /// so the tabs keep the full bar width while the buttons are hidden.
+    static func splitButtonLane(
+        showSplitButtons: Bool,
+        buttonCount: Int,
+        isMinimalMode: Bool,
+        splitButtonsOnHover: Bool,
+        isHoveringTabBar: Bool
+    ) -> (visible: Bool, reservesLane: Bool) {
+        let hidesUntilHover = hidesSplitButtonsUntilHover(
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: splitButtonsOnHover
+        )
+        let renders = showSplitButtons && buttonCount > 0
+        return (
+            visible: renders && (!hidesUntilHover || isHoveringTabBar),
+            reservesLane: showSplitButtons && !hidesUntilHover
+        )
+    }
+
     static func trailingTabContentInset(
         showSplitButtons: Bool,
         isMinimalMode: Bool,
@@ -723,6 +751,8 @@ struct TabContextMenuState {
     let hasSplits: Bool
     let shortcuts: [TabContextAction: KeyboardShortcut]
     var canDisconnectRemote: Bool = false
+    /// Shared-terminal presence; non-nil adds the terminal-size menu section.
+    var presence: TabPresence?
 
     var canMarkAsUnread: Bool {
         !isUnread
@@ -750,7 +780,8 @@ struct TabContextMenuState {
         isFullWidthTabMode: Bool = false,
         hasSplits: Bool,
         shortcuts: [TabContextAction: KeyboardShortcut],
-        canDisconnectRemote: Bool = false
+        canDisconnectRemote: Bool = false,
+        presence: TabPresence? = nil
     ) {
         self.isPinned = isPinned
         self.isUnread = isUnread
@@ -770,6 +801,7 @@ struct TabContextMenuState {
         self.hasSplits = hasSplits
         self.shortcuts = shortcuts
         self.canDisconnectRemote = canDisconnectRemote
+        self.presence = presence
     }
 
     @MainActor
@@ -811,7 +843,8 @@ struct TabContextMenuState {
             isFullWidthTabMode: pane.isFullWidthTabMode,
             hasSplits: splitViewController.rootNode.allPaneIds.count > 1,
             shortcuts: controller.contextMenuShortcuts,
-            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false
+            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false,
+            presence: tab.presence
         )
     }
 }
@@ -895,7 +928,7 @@ struct TabBarView: View {
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
             splitButtonCount: visibleSplitButtons.count,
             splitButtonLaneVisible: shouldShowSplitButtons,
-            reservesSplitButtonLane: showSplitButtons && !isMinimalMode,
+            reservesSplitButtonLane: splitButtonLane.reservesLane,
             measuredSplitButtonLaneWidth: measuredSplitButtonLaneWidth
         )
     }
@@ -920,7 +953,17 @@ struct TabBarView: View {
     }
 
     private var shouldShowSplitButtons: Bool {
-        shouldRenderSplitButtons && (!isMinimalMode || isHoveringTabBar)
+        splitButtonLane.visible
+    }
+
+    private var splitButtonLane: (visible: Bool, reservesLane: Bool) {
+        TabBarStyling.splitButtonLane(
+            showSplitButtons: showSplitButtons,
+            buttonCount: visibleSplitButtons.count,
+            isMinimalMode: isMinimalMode,
+            splitButtonsOnHover: appearance.splitButtonsOnHover,
+            isHoveringTabBar: isHoveringTabBar
+        )
     }
 
     private var splitButtonsBackdropWidth: CGFloat {
@@ -1618,6 +1661,7 @@ struct TabBarView: View {
                 splitActionButtonIcon(button.icon)
             }
             .buttonStyle(SplitActionButtonStyle(appearance: appearance, layout: tabBarLayout))
+            .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
         }
     }
 
