@@ -576,6 +576,43 @@ final class BonsplitTests: XCTestCase {
         )
     }
 
+    func testSplitButtonsOnHoverHidesSplitButtonsOutsideMinimalMode() {
+        XCTAssertFalse(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: false, splitButtonsOnHover: false))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: false, splitButtonsOnHover: true))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: true, splitButtonsOnHover: false))
+        XCTAssertTrue(TabBarStyling.hidesSplitButtonsUntilHover(isMinimalMode: true, splitButtonsOnHover: true))
+    }
+
+    func testSplitButtonsOnHoverDrivesVisibilityAndLaneReservation() {
+        func lane(minimal: Bool, onHover: Bool, hovering: Bool) -> (visible: Bool, reservesLane: Bool) {
+            TabBarStyling.splitButtonLane(
+                showSplitButtons: true,
+                buttonCount: 3,
+                isMinimalMode: minimal,
+                splitButtonsOnHover: onHover,
+                isHoveringTabBar: hovering
+            )
+        }
+
+        // Standard mode without the option: always visible, lane reserved.
+        XCTAssertTrue(lane(minimal: false, onHover: false, hovering: false) == (true, true))
+        // Standard mode with the option: hidden until hover, never reserves a lane.
+        XCTAssertTrue(lane(minimal: false, onHover: true, hovering: false) == (false, false))
+        XCTAssertTrue(lane(minimal: false, onHover: true, hovering: true) == (true, false))
+        // Minimal mode behaves the same regardless of the option.
+        XCTAssertTrue(lane(minimal: true, onHover: false, hovering: false) == (false, false))
+        XCTAssertTrue(lane(minimal: true, onHover: false, hovering: true) == (true, false))
+
+        let hidden = TabBarStyling.splitButtonLane(
+            showSplitButtons: false,
+            buttonCount: 3,
+            isMinimalMode: false,
+            splitButtonsOnHover: true,
+            isHoveringTabBar: true
+        )
+        XCTAssertTrue(hidden == (false, false))
+    }
+
     func testTabBarLayoutKeepsDefaultSplitButtonLaneWidthAsMinimum() {
         let compactMeasuredWidth =
             TabBarStyling.splitButtonsLeadingPadding
@@ -1291,6 +1328,32 @@ final class BonsplitTests: XCTestCase {
         XCTAssertEqual(Int(round(green * 255)), 34)
         XCTAssertEqual(Int(round(blue * 255)), 51)
         XCTAssertEqual(Int(round(alpha * 255)), 255)
+    }
+
+    func testChromeDividerHexColorsOnlyTheSplitDivider() {
+        let appearance = BonsplitConfiguration.Appearance(
+            chromeColors: .init(backgroundHex: "#272822", borderHex: "#112233", dividerHex: "#4A4C47")
+        )
+        let divider = TabBarColors.nsColorSplitDivider(for: appearance).usingColorSpace(.sRGB)!
+        let separator = TabBarColors.nsColorSeparator(for: appearance).usingColorSpace(.sRGB)!
+
+        XCTAssertEqual(Int(round(divider.redComponent * 255)), 0x4A)
+        XCTAssertEqual(Int(round(divider.greenComponent * 255)), 0x4C)
+        XCTAssertEqual(Int(round(divider.blueComponent * 255)), 0x47)
+        XCTAssertEqual(Int(round(separator.redComponent * 255)), 0x11)
+        XCTAssertEqual(Int(round(separator.greenComponent * 255)), 0x22)
+        XCTAssertEqual(Int(round(separator.blueComponent * 255)), 0x33)
+    }
+
+    func testSplitDividerFallsBackToSeparatorWithoutDividerHex() {
+        let appearance = BonsplitConfiguration.Appearance(
+            chromeColors: .init(backgroundHex: "#272822", borderHex: "#112233")
+        )
+
+        XCTAssertEqual(
+            TabBarColors.nsColorSplitDivider(for: appearance),
+            TabBarColors.nsColorSeparator(for: appearance)
+        )
     }
 
     func testInvalidChromeBackgroundHexFallsBackToPaneDefaultColor() {
