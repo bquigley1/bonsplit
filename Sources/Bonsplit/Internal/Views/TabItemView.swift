@@ -144,8 +144,7 @@ struct TabControlShortcutHintPillBackground: View {
     let isDark: Bool
 
     var body: some View {
-        Capsule(style: .continuous)
-            .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
+        fill
             .overlay(
                 Capsule(style: .continuous)
                     .stroke(
@@ -159,6 +158,30 @@ struct TabControlShortcutHintPillBackground: View {
                 x: TabControlShortcutHintStyle.shadowX,
                 y: TabControlShortcutHintStyle.shadowY
             )
+    }
+
+    /// Liquid Glass tinted with the pill palette where the OS has it, the
+    /// opaque palette fill before macOS 26. Matches the host's pills.
+    @ViewBuilder
+    private var fill: some View {
+        #if compiler(>=6.3)
+        if #available(macOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .regular.tint(TabControlShortcutHintStyle.backgroundColor(isDark: isDark).opacity(0.72)),
+                    in: Capsule(style: .continuous)
+                )
+        } else {
+            opaqueFill
+        }
+        #else
+        opaqueFill
+        #endif
+    }
+
+    private var opaqueFill: some View {
+        Capsule(style: .continuous)
+            .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
     }
 }
 
