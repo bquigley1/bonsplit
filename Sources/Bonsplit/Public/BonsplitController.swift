@@ -364,48 +364,34 @@ public final class BonsplitController {
             presence.map { currentTab.presence != $0 } ?? false
         guard didChange else { return }
 
-        if let title = title {
-            currentTab.title = title
-        }
-        if let icon = icon {
-            currentTab.icon = icon
-        }
-        if let iconImageData = iconImageData {
+        if let title, currentTab.title != title { currentTab.title = title }
+        if let icon, currentTab.icon != icon { currentTab.icon = icon }
+        if let iconImageData, currentTab.iconImageData != iconImageData {
             currentTab.iconImageData = iconImageData
         }
-        if let iconAsset = iconAsset {
-            currentTab.iconAsset = iconAsset
-        }
-        if let kind = kind {
-            currentTab.kind = kind
-        }
-        if let hasCustomTitle = hasCustomTitle {
+        if let iconAsset, currentTab.iconAsset != iconAsset { currentTab.iconAsset = iconAsset }
+        if let kind, currentTab.kind != kind { currentTab.kind = kind }
+        if let hasCustomTitle, currentTab.hasCustomTitle != hasCustomTitle {
             currentTab.hasCustomTitle = hasCustomTitle
         }
-        if let isDirty = isDirty {
-            currentTab.isDirty = isDirty
-        }
-        if let showsNotificationBadge = showsNotificationBadge {
+        if let isDirty, currentTab.isDirty != isDirty { currentTab.isDirty = isDirty }
+        if let showsNotificationBadge,
+           currentTab.showsNotificationBadge != showsNotificationBadge {
             currentTab.showsNotificationBadge = showsNotificationBadge
         }
-        if let isLoading = isLoading {
-            currentTab.isLoading = isLoading
-        }
-        if let isAudioMuted = isAudioMuted {
+        if let isLoading, currentTab.isLoading != isLoading { currentTab.isLoading = isLoading }
+        if let isAudioMuted, currentTab.isAudioMuted != isAudioMuted {
             currentTab.isAudioMuted = isAudioMuted
         }
-        if let isAudioPlaying = isAudioPlaying {
+        if let isAudioPlaying, currentTab.isAudioPlaying != isAudioPlaying {
             currentTab.isAudioPlaying = isAudioPlaying
         }
-        if let isPinned = isPinned {
-            currentTab.isPinned = isPinned
-        }
-        if let showsRemoteIndicator = showsRemoteIndicator {
+        if let isPinned, currentTab.isPinned != isPinned { currentTab.isPinned = isPinned }
+        if let showsRemoteIndicator,
+           currentTab.showsRemoteIndicator != showsRemoteIndicator {
             currentTab.showsRemoteIndicator = showsRemoteIndicator
         }
-        if let presence = presence {
-            pane.tabs[tabIndex].presence = presence
-        }
+        if let presence, currentTab.presence != presence { currentTab.presence = presence }
     }
 
     /// Close a tab by ID
