@@ -718,6 +718,55 @@ public final class BonsplitController {
         return newPaneId
     }
 
+    /// Add a pane holding `tab` and arrange all panes in Zellij's default
+    /// tiled layout (cmux-tui's Alt-n "new pane"). Panes fill a right-hand
+    /// column of up to four before a new column opens, and every column and
+    /// row gets an equal share. Existing panes keep their tabs and identity.
+    ///
+    /// - Parameters:
+    ///   - paneId: The pane the request comes from (defaults to the focused
+    ///     pane). The delegate sees it as the split source.
+    ///   - tab: The tab to place in the new pane.
+    /// - Returns: The new pane ID, or nil if splits are disabled or vetoed.
+    @discardableResult
+    public func addPaneWithAutoLayout(from paneId: PaneID? = nil, withTab tab: Tab) -> PaneID? {
+        guard configuration.allowSplits else { return nil }
+        guard let sourcePaneId = paneId ?? focusedPaneId,
+              internalController.paneState(for: sourcePaneId) != nil else { return nil }
+
+        let columnSizes = SplitViewController.autoLayoutColumnSizes(
+            paneCount: internalController.paneCount + 1
+        )
+        let orientation: SplitOrientation = columnSizes.last == 1 ? .horizontal : .vertical
+        if delegate?.splitTabBar(self, shouldSplitPane: sourcePaneId, orientation: orientation) == false {
+            return nil
+        }
+
+        let internalTab = TabItem(
+            id: tab.id.id,
+            title: tab.title,
+            hasCustomTitle: tab.hasCustomTitle,
+            icon: tab.icon,
+            iconImageData: tab.iconImageData,
+            iconAsset: tab.iconAsset,
+            kind: tab.kind,
+            isDirty: tab.isDirty,
+            showsNotificationBadge: tab.showsNotificationBadge,
+            isLoading: tab.isLoading,
+            isAudioMuted: tab.isAudioMuted,
+            isAudioPlaying: tab.isAudioPlaying,
+            isPinned: tab.isPinned,
+            showsRemoteIndicator: tab.showsRemoteIndicator
+        )
+        let newPaneId = internalController.insertPaneWithAutoLayout(tab: internalTab)
+
+        delegate?.splitTabBar(self, didSplitPane: sourcePaneId, newPane: newPaneId, orientation: orientation)
+
+        notifyGeometryChange()
+
+        return newPaneId
+    }
+
     private func normalizedInitialDividerPosition(_ position: CGFloat?) -> CGFloat {
         // A nil position must not bypass the configured range: the internal
         // controller's 0.5 fallback can sit outside a narrowed range, so the
@@ -850,7 +899,9 @@ public final class BonsplitController {
         }
     }
 
-    /// Find the closest pane in the requested direction from the given pane.
+    /// The pane directional navigation from `paneId` reaches: the most
+    /// recently focused pane sharing that edge, else the one most directly
+    /// across. Nil at the outer edge.
     public func adjacentPane(to paneId: PaneID, direction: NavigationDirection) -> PaneID? {
         internalController.adjacentPane(to: paneId, direction: direction)
     }

@@ -269,6 +269,9 @@ final class TabBarItemGeometryRegistry {
 
     /// The on-screen part of each tab: clipped by the strip's scroll view, so
     /// a tab scrolled past either edge contributes only what is visible.
+    /// `visibleRect` clips only at ancestors that clip (`clipsToBounds` is off
+    /// by default since macOS 14), so for these unclipped item views it spans
+    /// the whole strip; intersect with `bounds` to keep it to the tab itself.
     func visibleFrames(for tabIds: [UUID], in targetView: NSView) -> [UUID: CGRect] {
         var frames: [UUID: CGRect] = [:]
         frames.reserveCapacity(tabIds.count)
@@ -278,8 +281,8 @@ final class TabBarItemGeometryRegistry {
                   isVisibleInHierarchy(itemView) else {
                 continue
             }
-            let visible = itemView.visibleRect
-            guard !visible.isEmpty else { continue }
+            let visible = itemView.bounds.intersection(itemView.visibleRect)
+            guard !visible.isNull, !visible.isEmpty else { continue }
             frames[tabId] = itemView.convert(visible, to: targetView)
         }
         return frames
