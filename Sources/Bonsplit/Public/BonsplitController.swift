@@ -101,6 +101,11 @@ public final class BonsplitController {
     /// Internal host-driven closes should not use this hook.
     @ObservationIgnored public var onTabCloseRequest: ((_ tabId: TabID, _ paneId: PaneID, _ source: TabCloseRequestSource) -> Void)?
 
+    /// Host-provided middle-click capture overlay for tab items. AppKit hosts
+    /// can supply their shared capture view here without making Bonsplit depend
+    /// on the host UI package.
+    @ObservationIgnored public var tabMiddleClickCapture: ((@escaping () -> Void) -> AnyView)?
+
     /// Called when the user explicitly requests to toggle zoom from tab chrome.
     /// When set, the host owns the full toggle and should return whether it succeeded.
     @ObservationIgnored public var onTabZoomToggleRequest: (@MainActor (_ tabId: TabID, _ paneId: PaneID) -> Bool)?

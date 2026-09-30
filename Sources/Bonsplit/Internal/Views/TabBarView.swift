@@ -198,6 +198,14 @@ enum TabBarStyling {
         width > 0 && width < narrowPaneThreshold
     }
 
+    static func splitActionButtonCount(
+        isNarrowPane: Bool,
+        shouldShowSplitButtons: Bool,
+        visibleButtonCount: Int
+    ) -> Int {
+        isNarrowPane && shouldShowSplitButtons ? 1 : max(0, visibleButtonCount)
+    }
+
     static func minimumVisibleSplitButtonLaneWidth(buttonCount: Int) -> CGFloat {
         splitButtonsBackdropWidth(
             buttonCount: min(max(0, buttonCount), minimumFullyVisibleSplitButtonCount)
@@ -714,6 +722,7 @@ struct TabBarChromeSnapshot {
 
 struct TabContextMenuState {
     let isPinned: Bool
+    let canCloseTab: Bool
     let isUnread: Bool
     let isBrowser: Bool
     let isAudioMuted: Bool
@@ -742,6 +751,7 @@ struct TabContextMenuState {
 
     init(
         isPinned: Bool,
+        canCloseTab: Bool = true,
         isUnread: Bool,
         isBrowser: Bool,
         isAudioMuted: Bool,
@@ -761,6 +771,7 @@ struct TabContextMenuState {
         canDisconnectRemote: Bool = false
     ) {
         self.isPinned = isPinned
+        self.canCloseTab = canCloseTab
         self.isUnread = isUnread
         self.isBrowser = isBrowser
         self.isAudioMuted = isAudioMuted
@@ -803,6 +814,7 @@ struct TabContextMenuState {
             }
         self.init(
             isPinned: tab.isPinned,
+            canCloseTab: allowsCloseTabs && !tab.isPinned,
             isUnread: tab.showsNotificationBadge,
             isBrowser: tab.kind == "browser",
             isAudioMuted: tab.isAudioMuted,
@@ -897,7 +909,11 @@ struct TabBarView: View {
     }
 
     private var tabBarLayout: TabBarLayout {
-        let actionButtonCount = isNarrowPane ? 1 : visibleSplitButtons.count
+        let actionButtonCount = TabBarStyling.splitActionButtonCount(
+            isNarrowPane: isNarrowPane,
+            shouldShowSplitButtons: shouldShowSplitButtons,
+            visibleButtonCount: visibleSplitButtons.count
+        )
         return TabBarLayout(
             tabBarHeight: appearance.tabBarHeight,
             availableWidth: containerWidth,
@@ -1322,6 +1338,7 @@ struct TabBarView: View {
             showsControlShortcutHint: showsControlShortcutHints,
             shortcutModifierSymbol: controlKeyMonitor.shortcutModifierSymbol,
             allowsClose: controller.configuration.allowCloseTabs,
+            middleClickCapture: controller.tabMiddleClickCapture,
             allowsContextMenu: controller.configuration.allowsTabContextMenu,
             contextMenuState: contextMenuState,
             moveDestinationsProvider: {

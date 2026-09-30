@@ -19,6 +19,25 @@ final class TabBarLayoutFeedbackTests: XCTestCase {
         )
     }
 
+    func testNarrowPaneDoesNotReserveActionLaneWhenActionsAreHidden() {
+        XCTAssertEqual(
+            TabBarStyling.splitActionButtonCount(
+                isNarrowPane: true,
+                shouldShowSplitButtons: false,
+                visibleButtonCount: 0
+            ),
+            0
+        )
+        XCTAssertEqual(
+            TabBarStyling.splitActionButtonCount(
+                isNarrowPane: true,
+                shouldShowSplitButtons: true,
+                visibleButtonCount: 7
+            ),
+            1
+        )
+    }
+
     func testPinnedTabStaysAtLeadingEdgeWhileUnpinnedTabsScroll() throws {
         let size = NSSize(width: 420, height: TabBarMetrics.barHeight)
         let controller = BonsplitController(
