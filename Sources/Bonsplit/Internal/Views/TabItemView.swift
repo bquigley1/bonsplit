@@ -123,6 +123,8 @@ enum TabControlShortcutHintStyle {
     }
     static let horizontalPadding: CGFloat = 6
     static let verticalPadding: CGFloat = 2
+    /// Width of the Liquid Glass rim around the opaque center on macOS 26.
+    static let glassRimWidth: CGFloat = 1.5
     static let strokeWidth: CGFloat = 0.8
     static let shadowOpacity = 0.22
     static let shadowRadius: CGFloat = 2
@@ -144,6 +146,39 @@ struct TabControlShortcutHintPillBackground: View {
     let isDark: Bool
 
     var body: some View {
+        fill
+            .shadow(
+                color: Color.black.opacity(TabControlShortcutHintStyle.shadowOpacity),
+                radius: TabControlShortcutHintStyle.shadowRadius,
+                x: TabControlShortcutHintStyle.shadowX,
+                y: TabControlShortcutHintStyle.shadowY
+            )
+    }
+
+    /// A Liquid Glass rim around the opaque palette center where the OS has
+    /// glass, the bordered opaque capsule before macOS 26. Glass takes its
+    /// color from the backdrop, so the text sits on the opaque fill and keeps
+    /// its contrast. Matches the host's pills.
+    @ViewBuilder
+    private var fill: some View {
+        #if compiler(>=6.3)
+        if #available(macOS 26.0, *) {
+            ZStack {
+                Color.clear
+                    .glassEffect(.regular, in: Capsule(style: .continuous))
+                Capsule(style: .continuous)
+                    .inset(by: TabControlShortcutHintStyle.glassRimWidth)
+                    .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
+            }
+        } else {
+            opaqueFill
+        }
+        #else
+        opaqueFill
+        #endif
+    }
+
+    private var opaqueFill: some View {
         Capsule(style: .continuous)
             .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
             .overlay(
@@ -152,12 +187,6 @@ struct TabControlShortcutHintPillBackground: View {
                         TabControlShortcutHintStyle.borderColor(isDark: isDark),
                         lineWidth: TabControlShortcutHintStyle.strokeWidth
                     )
-            )
-            .shadow(
-                color: Color.black.opacity(TabControlShortcutHintStyle.shadowOpacity),
-                radius: TabControlShortcutHintStyle.shadowRadius,
-                x: TabControlShortcutHintStyle.shadowX,
-                y: TabControlShortcutHintStyle.shadowY
             )
     }
 }
