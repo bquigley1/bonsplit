@@ -42,3 +42,14 @@
 "tabContext.disconnectRemote" = "Disconnect SSH";
 "tabContext.remoteConnectedAccessibility" = "Connected over SSH";
 "tab.close.accessibilityLabel" = "Close Tab";
+
+/* Shared terminal sizing */
+"tabContext.sizeToMyWindow" = "Size to My Window";
+"tabContext.terminalSizeHeader" = "Terminal Size";
+"tabContext.sizeMode.largest" = "Largest Window";
+"tabContext.sizeMode.priority" = "Priority List…";
+"tabContext.sizeMode.fixed" = "Fixed Size…";
+"tabContext.disconnectOthers" = "Disconnect Others…";
+"tabContext.sizeMode.followLatest" = "Follow Latest";
+"tabContext.sizeMode.fitEveryone" = "Fit Everyone";
+"tabPresence.toggleSizePanel" = "Shows or hides the terminal size panel";

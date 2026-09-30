@@ -327,6 +327,7 @@ public final class BonsplitController {
     ///   - isAudioMuted: New browser-audio mute state (pass nil to keep current)
     ///   - isAudioPlaying: New audible-audio state (pass nil to keep current)
     ///   - isPinned: New pinned state (pass nil to keep current)
+    ///   - presence: New shared-terminal presence (pass nil to keep current, pass .some(nil) to remove)
     public func updateTab(
         _ tabId: TabID,
         title: String? = nil,
@@ -341,7 +342,8 @@ public final class BonsplitController {
         isAudioMuted: Bool? = nil,
         isAudioPlaying: Bool? = nil,
         isPinned: Bool? = nil,
-        showsRemoteIndicator: Bool? = nil
+        showsRemoteIndicator: Bool? = nil,
+        presence: TabPresence?? = nil
     ) {
         guard let (pane, tabIndex) = findTabInternal(tabId) else { return }
         let currentTab = pane.tabs[tabIndex]
@@ -358,7 +360,8 @@ public final class BonsplitController {
             isAudioMuted.map { currentTab.isAudioMuted != $0 } ?? false ||
             isAudioPlaying.map { currentTab.isAudioPlaying != $0 } ?? false ||
             isPinned.map { currentTab.isPinned != $0 } ?? false ||
-            showsRemoteIndicator.map { currentTab.showsRemoteIndicator != $0 } ?? false
+            showsRemoteIndicator.map { currentTab.showsRemoteIndicator != $0 } ?? false ||
+            presence.map { currentTab.presence != $0 } ?? false
         guard didChange else { return }
 
         if let title = title {
@@ -399,6 +402,9 @@ public final class BonsplitController {
         }
         if let showsRemoteIndicator = showsRemoteIndicator {
             pane.tabs[tabIndex].showsRemoteIndicator = showsRemoteIndicator
+        }
+        if let presence = presence {
+            pane.tabs[tabIndex].presence = presence
         }
     }
 
@@ -574,7 +580,8 @@ public final class BonsplitController {
             isAudioMuted: tab.isAudioMuted,
             isAudioPlaying: tab.isAudioPlaying,
             isPinned: tab.isPinned,
-            showsRemoteIndicator: tab.showsRemoteIndicator
+            showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
         )
         let newPaneId = internalController.splitRootWithTab(
             orientation: orientation,
@@ -626,7 +633,8 @@ public final class BonsplitController {
                 isAudioMuted: tab.isAudioMuted,
                 isAudioPlaying: tab.isAudioPlaying,
                 isPinned: tab.isPinned,
-                showsRemoteIndicator: tab.showsRemoteIndicator
+                showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
             )
         } else {
             internalTab = nil
@@ -695,7 +703,8 @@ public final class BonsplitController {
             isAudioMuted: tab.isAudioMuted,
             isAudioPlaying: tab.isAudioPlaying,
             isPinned: tab.isPinned,
-            showsRemoteIndicator: tab.showsRemoteIndicator
+            showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
         )
 
         // Perform split with insertion side.
