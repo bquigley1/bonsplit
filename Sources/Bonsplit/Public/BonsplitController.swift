@@ -369,48 +369,34 @@ public final class BonsplitController {
             presence.map { currentTab.presence != $0 } ?? false
         guard didChange else { return }
 
-        if let title = title {
-            pane.tabs[tabIndex].title = title
+        if let title, currentTab.title != title { currentTab.title = title }
+        if let icon, currentTab.icon != icon { currentTab.icon = icon }
+        if let iconImageData, currentTab.iconImageData != iconImageData {
+            currentTab.iconImageData = iconImageData
         }
-        if let icon = icon {
-            pane.tabs[tabIndex].icon = icon
+        if let iconAsset, currentTab.iconAsset != iconAsset { currentTab.iconAsset = iconAsset }
+        if let kind, currentTab.kind != kind { currentTab.kind = kind }
+        if let hasCustomTitle, currentTab.hasCustomTitle != hasCustomTitle {
+            currentTab.hasCustomTitle = hasCustomTitle
         }
-        if let iconImageData = iconImageData {
-            pane.tabs[tabIndex].iconImageData = iconImageData
+        if let isDirty, currentTab.isDirty != isDirty { currentTab.isDirty = isDirty }
+        if let showsNotificationBadge,
+           currentTab.showsNotificationBadge != showsNotificationBadge {
+            currentTab.showsNotificationBadge = showsNotificationBadge
         }
-        if let iconAsset = iconAsset {
-            pane.tabs[tabIndex].iconAsset = iconAsset
+        if let isLoading, currentTab.isLoading != isLoading { currentTab.isLoading = isLoading }
+        if let isAudioMuted, currentTab.isAudioMuted != isAudioMuted {
+            currentTab.isAudioMuted = isAudioMuted
         }
-        if let kind = kind {
-            pane.tabs[tabIndex].kind = kind
+        if let isAudioPlaying, currentTab.isAudioPlaying != isAudioPlaying {
+            currentTab.isAudioPlaying = isAudioPlaying
         }
-        if let hasCustomTitle = hasCustomTitle {
-            pane.tabs[tabIndex].hasCustomTitle = hasCustomTitle
+        if let isPinned, currentTab.isPinned != isPinned { currentTab.isPinned = isPinned }
+        if let showsRemoteIndicator,
+           currentTab.showsRemoteIndicator != showsRemoteIndicator {
+            currentTab.showsRemoteIndicator = showsRemoteIndicator
         }
-        if let isDirty = isDirty {
-            pane.tabs[tabIndex].isDirty = isDirty
-        }
-        if let showsNotificationBadge = showsNotificationBadge {
-            pane.tabs[tabIndex].showsNotificationBadge = showsNotificationBadge
-        }
-        if let isLoading = isLoading {
-            pane.tabs[tabIndex].isLoading = isLoading
-        }
-        if let isAudioMuted = isAudioMuted {
-            pane.tabs[tabIndex].isAudioMuted = isAudioMuted
-        }
-        if let isAudioPlaying = isAudioPlaying {
-            pane.tabs[tabIndex].isAudioPlaying = isAudioPlaying
-        }
-        if let isPinned = isPinned {
-            pane.tabs[tabIndex].isPinned = isPinned
-        }
-        if let showsRemoteIndicator = showsRemoteIndicator {
-            pane.tabs[tabIndex].showsRemoteIndicator = showsRemoteIndicator
-        }
-        if let presence = presence {
-            pane.tabs[tabIndex].presence = presence
-        }
+        if let presence, currentTab.presence != presence { currentTab.presence = presence }
     }
 
     /// Close a tab by ID
@@ -1044,6 +1030,20 @@ public final class BonsplitController {
             return []
         }
         return pane.tabs.map { Tab(from: $0) }
+    }
+
+    /// Get the tab IDs in a specific pane, in tab order.
+    ///
+    /// Prefer this over `tabs(inPane:)` when only identity or ordering is
+    /// wanted. This maps each `TabItem` directly to a `TabID` without building
+    /// a `Tab` snapshot and copying its metadata. Together with `TabItem`'s
+    /// per-tab observation, this avoids title-driven invalidation for callers
+    /// that only read IDs; this method alone does not change observation.
+    public func tabIds(inPane paneId: PaneID) -> [TabID] {
+        guard let pane = internalController.paneState(for: paneId) else {
+            return []
+        }
+        return pane.tabs.map { TabID(id: $0.id) }
     }
 
     /// Get the pane that currently owns a tab.
