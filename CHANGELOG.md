@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other non-browser) tabs keep their titled layout.
 
 ### Fixed
+- A tab title change no longer re-renders the whole tab bar. `TabItem` is now a
+  reference type, so writing one tab's title touches that object instead of the
+  `@Observable` `PaneState.tabs` array, and observation delivers the change to
+  the one `TabItemView` that reads the title. Inserting, removing, and moving
+  tabs still publish through `tabs`. Equality and hashing were already by `id`,
+  so identity comparisons are unaffected.
 - Split-button icons no longer re-resolve their SF Symbol on every tab bar body
   evaluation. `TabBarStyling.splitActionSystemImage(for:)` tested whether a name
   was a real symbol by allocating an `NSImage` and discarding it, which cost
