@@ -898,7 +898,7 @@ struct TabBarView: View {
 
     private var tabBarLayout: TabBarLayout {
         let actionButtonCount = isNarrowPane ? 1 : visibleSplitButtons.count
-        TabBarLayout(
+        return TabBarLayout(
             tabBarHeight: appearance.tabBarHeight,
             availableWidth: containerWidth,
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
