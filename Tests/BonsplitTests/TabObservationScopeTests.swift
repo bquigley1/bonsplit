@@ -137,4 +137,35 @@ final class TabObservationScopeTests: XCTestCase {
 
         XCTAssertFalse(titleInvalidated)
     }
+
+    /// The tab bar reads this complete per-tab projection while laying out its
+    /// rows. A title plus an unchanged custom-title flag is cmux's update shape.
+    @MainActor
+    func testTitleWithUnchangedCustomTitleDoesNotInvalidateTheTabBarProjection() throws {
+        let controller = BonsplitController()
+        let paneId = try XCTUnwrap(controller.focusedPaneId)
+        let pane = try XCTUnwrap(controller.internalController.paneState(for: paneId))
+        let tabId = try XCTUnwrap(controller.createTab(title: "First"))
+
+        var projectionInvalidated = false
+        withObservationTracking {
+            for tab in pane.tabs {
+                _ = tab.hasCustomTitle
+                _ = tab.isPinned
+                _ = tab.kind
+                _ = tab.isAudioMuted
+                _ = tab.showsNotificationBadge
+                _ = tab.presence
+            }
+        } onChange: {
+            projectionInvalidated = true
+        }
+
+        controller.updateTab(tabId, title: "First (running)", hasCustomTitle: false)
+
+        XCTAssertFalse(
+            projectionInvalidated,
+            "A title plus an unchanged custom-title flag must not invalidate the tab bar projection"
+        )
+    }
 }
