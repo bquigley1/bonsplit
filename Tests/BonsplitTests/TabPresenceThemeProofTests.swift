@@ -96,54 +96,91 @@ private struct ThemeProofView: View {
         .background(selected ? TabBarColors.activeTabBackground(for: appearance) : .clear)
     }
 
-    /// Mirrors the host's `TerminalSizeBoundsOverlayView`: border on the
-    /// open sides, hatch outside the grid, and the chip below it.
+    /// The host's default chrome border for this background, as cmux's
+    /// `WindowChromeColorResolver.separatorColor(forChromeBackground:)`
+    /// resolves it; the split divider falls back to it.
+    private var hostBorderHex: String {
+        let rgb = BonsplitContrastPalette.RGB(hex: background)!
+        let isLight = 0.299 * rgb.red + 0.587 * rgb.green + 0.114 * rgb.blue > 0.5
+        let amount = isLight ? -0.30 : 0.16
+        let alpha = isLight ? 0.26 : 0.36
+        func byte(_ value: Double) -> String { String(format: "%02x", Int((min(1, max(0, value)) * 255).rounded())) }
+        return "#" + byte(rgb.red + amount) + byte(rgb.green + amount) + byte(rgb.blue + amount) + byte(alpha)
+    }
+
+    /// Mirrors the host's `TerminalSizeBoundsOverlayView` next to a split
+    /// divider: border on the open sides and the chip outline in the
+    /// divider's color, a fainter hatch with no fill, chip text 4.5:1.
     private var pane: some View {
-        let palette = BonsplitContrastPalette(
-            background: BonsplitContrastPalette.RGB(hex: background)!,
-            foreground: BonsplitContrastPalette.RGB(hex: foreground)!
+        var dividerAppearance = appearance
+        dividerAppearance.chromeColors.borderHex = hostBorderHex
+        let divider: NSColor = dividerAppearance.splitDividerColor
+        let background = BonsplitContrastPalette.RGB(hex: self.background)!
+        let terminalBackground = NSColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: 1)
+        let palette = BonsplitSizingChromePalette(
+            background: background,
+            foreground: BonsplitContrastPalette.RGB(hex: foreground)!,
+            line: BonsplitContrastPalette.rgb(divider, over: terminalBackground)
         )
-        func color(_ rgb: BonsplitContrastPalette.RGB) -> Color {
-            Color(nsColor: NSColor(srgbRed: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1))
-        }
-        let grid = CGRect(x: 0, y: 0, width: 280, height: 90)
         return Canvas { context, size in
-            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(color(palette.background)))
-            var hatch = Path()
-            var x = -size.height
-            while x < size.width {
-                hatch.move(to: CGPoint(x: x, y: size.height))
-                hatch.addLine(to: CGPoint(x: x + size.height, y: 0))
-                x += 8
-            }
-            var outside = Path(CGRect(origin: .zero, size: size))
-            outside.addRect(grid)
-            context.drawLayer { layer in
-                layer.clip(to: outside, style: FillStyle(eoFill: true))
-                layer.stroke(hatch, with: .color(color(palette.hatch)), lineWidth: 0.5)
-            }
-            for (index, line) in ["$ claude", "> Refactor the sizing palette", "  Reading 4 files…"].enumerated() {
-                context.draw(
-                    Text(line).font(.system(size: 11, design: .monospaced)).foregroundColor(color(palette.foreground)),
-                    at: CGPoint(x: 8, y: 12 + CGFloat(index) * 16),
-                    anchor: .leading
-                )
-            }
-            var border = Path()
-            border.move(to: CGPoint(x: grid.maxX - 0.5, y: 0))
-            border.addLine(to: CGPoint(x: grid.maxX - 0.5, y: grid.maxY - 0.5))
-            border.addLine(to: CGPoint(x: 0, y: grid.maxY - 0.5))
-            context.stroke(border, with: .color(color(palette.line)), lineWidth: 1)
-            let chipText = context.resolve(
-                Text("118×38 · Maya's Mac").font(.system(size: 11).monospacedDigit()).foregroundColor(color(palette.glyph))
-            )
-            let textSize = chipText.measure(in: size)
-            let chip = CGRect(x: grid.maxX - textSize.width - 12, y: grid.maxY + 4, width: textSize.width + 12, height: textSize.height + 6)
-            let chipPath = Path(roundedRect: chip.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 4)
-            context.fill(chipPath, with: .color(color(palette.fill)))
-            context.stroke(chipPath, with: .color(color(palette.line)), lineWidth: 1)
-            context.draw(chipText, at: CGPoint(x: chip.midX, y: chip.midY))
+            Self.drawPane(in: &context, size: size, palette: palette, foreground: foreground, divider: divider)
         }
         .frame(height: 130)
+    }
+
+    private static func color(_ rgb: BonsplitContrastPalette.RGB) -> Color {
+        Color(nsColor: NSColor(srgbRed: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1))
+    }
+
+    private static func drawPane(
+        in context: inout GraphicsContext,
+        size: CGSize,
+        palette: BonsplitSizingChromePalette,
+        foreground: String,
+        divider: NSColor
+    ) {
+        let text: Color = color(BonsplitContrastPalette.RGB(hex: foreground)!)
+        let neighborWidth: CGFloat = 100
+        let grid = CGRect(x: neighborWidth + 1, y: 0, width: 220, height: 90)
+        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(color(palette.background)))
+        // The neighbouring split pane and the divider between them.
+        let prompt = Text("$ ls").font(.system(size: 11, design: .monospaced)).foregroundColor(text)
+        context.draw(prompt, at: CGPoint(x: 8, y: 12), anchor: .leading)
+        let dividerRect = CGRect(x: neighborWidth, y: 0, width: 1, height: size.height)
+        context.fill(Path(dividerRect), with: .color(Color(nsColor: divider)))
+        let paneRect = CGRect(x: neighborWidth + 1, y: 0, width: size.width - neighborWidth - 1, height: size.height)
+        var hatch = Path()
+        var x = -size.height
+        while x < size.width {
+            hatch.move(to: CGPoint(x: x, y: size.height))
+            hatch.addLine(to: CGPoint(x: x + size.height, y: 0))
+            x += 8
+        }
+        var outside = Path(paneRect)
+        outside.addRect(grid)
+        let hatchColor: Color = color(palette.hatch)
+        context.drawLayer { layer in
+            layer.clip(to: outside, style: FillStyle(eoFill: true))
+            layer.stroke(hatch, with: .color(hatchColor), lineWidth: 0.5)
+        }
+        let lines = ["$ claude", "> Refactor the sizing palette", "  Reading 4 files…"]
+        for (index, line) in lines.enumerated() {
+            let row = Text(line).font(.system(size: 11, design: .monospaced)).foregroundColor(text)
+            context.draw(row, at: CGPoint(x: grid.minX + 8, y: 12 + CGFloat(index) * 16), anchor: .leading)
+        }
+        var border = Path()
+        border.move(to: CGPoint(x: grid.maxX - 0.5, y: 0))
+        border.addLine(to: CGPoint(x: grid.maxX - 0.5, y: grid.maxY - 0.5))
+        border.addLine(to: CGPoint(x: grid.minX, y: grid.maxY - 0.5))
+        let lineColor: Color = color(palette.line)
+        context.stroke(border, with: .color(lineColor), lineWidth: 1)
+        let label = Text("118×38 · Maya's Mac").font(.system(size: 11).monospacedDigit()).foregroundColor(color(palette.text))
+        let chipText = context.resolve(label)
+        let textSize = chipText.measure(in: size)
+        let chip = CGRect(x: grid.maxX - textSize.width - 12, y: grid.maxY + 4, width: textSize.width + 12, height: textSize.height + 6)
+        let chipPath = Path(roundedRect: chip.insetBy(dx: 0.5, dy: 0.5), cornerRadius: 4)
+        context.fill(chipPath, with: .color(color(palette.chipFill)))
+        context.stroke(chipPath, with: .color(lineColor), lineWidth: 1)
+        context.draw(chipText, at: CGPoint(x: chip.midX, y: chip.midY))
     }
 }
