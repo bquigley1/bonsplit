@@ -2073,6 +2073,41 @@ final class BonsplitTests: XCTestCase {
     }
 
     @MainActor
+    func testTabContextMenuDisablesCloseTabWhenClosingIsDisabled() throws {
+        let state = TabContextMenuState(
+            isPinned: false,
+            canCloseTab: false,
+            isUnread: false,
+            isBrowser: false,
+            isAudioMuted: false,
+            isTerminal: true,
+            hasCustomTitle: false,
+            canCloseToLeft: false,
+            canCloseToRight: false,
+            canCloseOthers: false,
+            canMoveToNewWorkspace: false,
+            canMoveToLeftPane: false,
+            canMoveToRightPane: false,
+            forkConversationDefaultAction: .forkConversationRight,
+            isZoomed: false,
+            hasSplits: false,
+            shortcuts: [:]
+        )
+        let menu = TabContextMenuBuilder.makeMenu(
+            snapshot: TabContextMenuSnapshot(
+                tabId: UUID(),
+                state: state,
+                moveDestinationsProvider: { [] },
+                forkConversationAvailabilityProvider: { .hidden }
+            ),
+            target: TabContextMenuActionTarget()
+        )
+
+        let closeItem = try XCTUnwrap(menu.items.first { $0.title == "Close Tab" })
+        XCTAssertFalse(closeItem.isEnabled)
+    }
+
+    @MainActor
     func testBrowserTabContextMenuCreatesAudioMuteToggle() throws {
         let target = TabContextMenuActionTarget()
         var selectedAction: TabContextAction?
