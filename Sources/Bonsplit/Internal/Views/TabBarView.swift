@@ -912,6 +912,7 @@ struct TabBarView: View {
     @State private var splitButtonScrollOffset: CGFloat = 0
     @State private var splitButtonContentWidth: CGFloat = 0
     @State private var splitButtonViewportWidth: CGFloat = 0
+    @State private var pressedSplitActionButtonId: String?
     @State private var controlKeyMonitor = TabControlShortcutKeyMonitor()
     @State private var tabItemGeometryRegistry = TabBarItemGeometryRegistry()
 
@@ -986,7 +987,7 @@ struct TabBarView: View {
 
     private var visibleSplitButtons: [BonsplitConfiguration.SplitActionButton] {
         guard showSplitButtons else { return [] }
-        return appearance.splitButtons
+        return pane.splitButtonsOverride ?? appearance.splitButtons
     }
 
     private var isNarrowPane: Bool {
@@ -1550,7 +1551,11 @@ struct TabBarView: View {
         Menu {
             ForEach(visibleSplitButtons) { button in
                 Button {
-                    performSplitActionButton(button)
+                    if button.menuBehavior == .primary {
+                        presentSplitActionMenuAtMouseLocation(button)
+                    } else {
+                        performSplitActionButton(button)
+                    }
                 } label: {
                     Text(splitActionButtonTooltip(button, tooltips: appearance.splitButtonTooltips))
                 }
@@ -1713,7 +1718,39 @@ struct TabBarView: View {
         _ button: BonsplitConfiguration.SplitActionButton,
         tooltips: BonsplitConfiguration.SplitButtonTooltips
     ) -> some View {
-        if button.activatesOnMouseDown {
+        if button.usesMenuInteraction {
+            let isPressed = pressedSplitActionButtonId == button.id
+            splitActionButtonIcon(button.icon)
+                .frame(height: tabBarLayout.splitActionButtonHeight)
+                .contentShape(Rectangle())
+                .foregroundStyle(TabBarColors.splitActionIcon(for: appearance, isPressed: isPressed))
+                .opacity(isPressed ? 0.72 : 1.0)
+                .tabBarButtonAnimationsDisabled()
+                .overlay(
+                    SplitActionMenuInteractionOverlay(
+                        menuBehavior: button.menuBehavior,
+                        onPressChanged: { pressed in
+                            pressedSplitActionButtonId = pressed ? button.id : nil
+                        },
+                        onClick: { optionKeyHeld in
+                            performSplitActionButton(button, optionKeyHeld: optionKeyHeld)
+                        },
+                        menuProvider: {
+                            splitActionMenu(for: button)
+                        }
+                    )
+                )
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    if button.menuBehavior == .primary {
+                        presentSplitActionMenuAtMouseLocation(button)
+                    } else {
+                        performSplitActionButton(button)
+                    }
+                }
+        } else if button.activatesOnMouseDown {
             splitActionButtonIcon(button.icon)
                 .frame(height: tabBarLayout.splitActionButtonHeight)
                 .contentShape(Rectangle())
@@ -1828,10 +1865,13 @@ struct TabBarView: View {
         }
     }
 
-    private func performSplitActionButton(_ button: BonsplitConfiguration.SplitActionButton) {
+    private func performSplitActionButton(
+        _ button: BonsplitConfiguration.SplitActionButton,
+        optionKeyHeld: Bool = false
+    ) {
         guard splitViewController.isInteractive else { return }
 
-        switch button.action {
+        switch button.resolvedAction(optionKeyHeld: optionKeyHeld) {
         case .newTerminal:
             controller.requestNewTab(kind: "terminal", inPane: pane.id)
         case .newBrowser:
@@ -1844,6 +1884,21 @@ struct TabBarView: View {
             controller.splitPane(pane.id, orientation: .vertical)
         case .custom(let identifier):
             controller.requestCustomAction(identifier, inPane: pane.id)
+        }
+    }
+
+    private func splitActionMenu(for button: BonsplitConfiguration.SplitActionButton) -> NSMenu? {
+        guard splitViewController.isInteractive, button.menuBehavior != .none else { return nil }
+        return controller.splitActionMenu(forButton: button.id, inPane: pane.id)
+    }
+
+    /// Shows a button's menu at the pointer. Used where no anchor view exists:
+    /// the collapsed narrow-pane overflow menu and the accessibility action.
+    private func presentSplitActionMenuAtMouseLocation(_ button: BonsplitConfiguration.SplitActionButton) {
+        guard let menu = splitActionMenu(for: button) else { return }
+        // Defer so a dismissing SwiftUI menu finishes its tracking loop first.
+        Task { @MainActor in
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
         }
     }
 
@@ -2070,6 +2125,122 @@ private final class SplitActionMouseDownNSView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         onMouseDown?()
+    }
+}
+
+/// Mouse handling for action buttons that carry a menu or an Option-click
+/// alternate. Click performs the action (reporting whether Option was held),
+/// right-click or press-and-hold opens the menu for `.secondary`, and any
+/// left mouse down opens the menu for `.primary`.
+private struct SplitActionMenuInteractionOverlay: NSViewRepresentable {
+    let menuBehavior: BonsplitConfiguration.SplitActionButton.MenuBehavior
+    let onPressChanged: (Bool) -> Void
+    let onClick: (Bool) -> Void
+    let menuProvider: () -> NSMenu?
+
+    func makeNSView(context: Context) -> SplitActionMenuInteractionNSView {
+        let view = SplitActionMenuInteractionNSView()
+        update(view)
+        return view
+    }
+
+    func updateNSView(_ nsView: SplitActionMenuInteractionNSView, context: Context) {
+        update(nsView)
+    }
+
+    private func update(_ view: SplitActionMenuInteractionNSView) {
+        view.menuBehavior = menuBehavior
+        view.onPressChanged = onPressChanged
+        view.onClick = onClick
+        view.menuProvider = menuProvider
+    }
+}
+
+final class SplitActionMenuInteractionNSView: NSView {
+    /// Press duration after which a `.secondary` button opens its menu instead of clicking.
+    static let holdToOpenMenuDelay: TimeInterval = 0.35
+
+    var menuBehavior: BonsplitConfiguration.SplitActionButton.MenuBehavior = .none
+    var onPressChanged: ((Bool) -> Void)?
+    var onClick: ((Bool) -> Void)?
+    var menuProvider: (() -> NSMenu?)?
+    private(set) var isTrackingPress = false
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        cancelPendingHold()
+        if menuBehavior == .primary {
+            showMenu()
+            return
+        }
+        isTrackingPress = true
+        onPressChanged?(true)
+        if menuBehavior == .secondary {
+            perform(
+                #selector(holdToOpenMenuDelayElapsed),
+                with: nil,
+                afterDelay: Self.holdToOpenMenuDelay,
+                inModes: [.common]
+            )
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard isTrackingPress else { return }
+        cancelPendingHold()
+        endPress()
+        let location = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(location) else { return }
+        onClick?(event.modifierFlags.contains(.option))
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        guard menuBehavior != .none else {
+            super.rightMouseDown(with: event)
+            return
+        }
+        cancelPendingHold()
+        endPress()
+        showMenu()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            cancelPendingHold()
+            endPress()
+        }
+    }
+
+    @objc private func holdToOpenMenuDelayElapsed() {
+        guard isTrackingPress else { return }
+        endPress()
+        showMenu()
+    }
+
+    private func cancelPendingHold() {
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(holdToOpenMenuDelayElapsed),
+            object: nil
+        )
+    }
+
+    private func endPress() {
+        guard isTrackingPress else { return }
+        isTrackingPress = false
+        onPressChanged?(false)
+    }
+
+    private func showMenu() {
+        guard let menu = menuProvider?() else { return }
+        let anchor = NSPoint(x: bounds.minX, y: isFlipped ? bounds.maxY : bounds.minY)
+        menu.popUp(positioning: nil, at: anchor, in: self)
     }
 }
 
