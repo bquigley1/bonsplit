@@ -24,6 +24,23 @@ struct SplitActionButtonMenuTests {
         #expect(decoded.alternateAction == .splitDown)
     }
 
+    @Test("offersNewTerminal round-trips and is omitted when false")
+    func offersNewTerminalRoundTrips() throws {
+        let add = ActionButton(
+            id: "add",
+            systemImage: "plus",
+            action: .custom("add"),
+            menuBehavior: .secondary,
+            offersNewTerminal: true
+        )
+        let decoded = try JSONDecoder().decode(ActionButton.self, from: try JSONEncoder().encode(add))
+        #expect(decoded.offersNewTerminal)
+
+        let plainData = try JSONEncoder().encode(ActionButton.newTerminal)
+        let plain = try #require(JSONSerialization.jsonObject(with: plainData) as? [String: Any])
+        #expect(plain["offersNewTerminal"] == nil)
+    }
+
     @Test("Buttons without menu fields keep their previous encoding")
     func plainButtonEncodingOmitsNewKeys() throws {
         let data = try JSONEncoder().encode(ActionButton.splitRight)

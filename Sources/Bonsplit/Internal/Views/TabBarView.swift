@@ -1904,10 +1904,14 @@ struct TabBarView: View {
 
     private func performNewTerminalSplitButtonAction() -> Bool {
         guard splitViewController.isInteractive else { return false }
-        guard let button = visibleSplitButtons.first(where: { $0.action == .newTerminal }) else {
+        if let button = visibleSplitButtons.first(where: { $0.action == .newTerminal }) {
+            performSplitActionButton(button)
+            return true
+        }
+        guard visibleSplitButtons.contains(where: { $0.offersNewTerminal }) else {
             return false
         }
-        performSplitActionButton(button)
+        controller.requestNewTab(kind: "terminal", inPane: pane.id)
         return true
     }
 

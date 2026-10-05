@@ -313,6 +313,11 @@ extension BonsplitConfiguration {
         public var alternateAction: Action?
         /// Whether and how the button opens a host-provided menu.
         public var menuBehavior: MenuBehavior
+        /// Marks a button whose menu offers a new terminal even though its
+        /// click action is something else. Double-clicking empty tab bar space
+        /// creates a terminal when a `.newTerminal` button or a button with
+        /// this flag is shown.
+        public var offersNewTerminal: Bool
 
         private enum CodingKeys: String, CodingKey {
             case id
@@ -322,6 +327,7 @@ extension BonsplitConfiguration {
             case activatesOnMouseDown
             case alternateAction
             case menuBehavior
+            case offersNewTerminal
         }
 
         /// Whether this button uses the menu-aware interaction path
@@ -352,7 +358,8 @@ extension BonsplitConfiguration {
             action: Action,
             activatesOnMouseDown: Bool = false,
             alternateAction: Action? = nil,
-            menuBehavior: MenuBehavior = .none
+            menuBehavior: MenuBehavior = .none,
+            offersNewTerminal: Bool = false
         ) {
             self.init(
                 id: id,
@@ -361,7 +368,8 @@ extension BonsplitConfiguration {
                 action: action,
                 activatesOnMouseDown: activatesOnMouseDown,
                 alternateAction: alternateAction,
-                menuBehavior: menuBehavior
+                menuBehavior: menuBehavior,
+                offersNewTerminal: offersNewTerminal
             )
         }
 
@@ -372,7 +380,8 @@ extension BonsplitConfiguration {
             action: Action,
             activatesOnMouseDown: Bool = false,
             alternateAction: Action? = nil,
-            menuBehavior: MenuBehavior = .none
+            menuBehavior: MenuBehavior = .none,
+            offersNewTerminal: Bool = false
         ) {
             self.id = id
             self.icon = icon
@@ -381,6 +390,7 @@ extension BonsplitConfiguration {
             self.activatesOnMouseDown = activatesOnMouseDown
             self.alternateAction = alternateAction
             self.menuBehavior = menuBehavior
+            self.offersNewTerminal = offersNewTerminal
         }
 
         public init(from decoder: Decoder) throws {
@@ -392,6 +402,7 @@ extension BonsplitConfiguration {
             activatesOnMouseDown = try container.decodeIfPresent(Bool.self, forKey: .activatesOnMouseDown) ?? false
             alternateAction = try container.decodeIfPresent(Action.self, forKey: .alternateAction)
             menuBehavior = try container.decodeIfPresent(MenuBehavior.self, forKey: .menuBehavior) ?? .none
+            offersNewTerminal = try container.decodeIfPresent(Bool.self, forKey: .offersNewTerminal) ?? false
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -406,6 +417,9 @@ extension BonsplitConfiguration {
             try container.encodeIfPresent(alternateAction, forKey: .alternateAction)
             if menuBehavior != .none {
                 try container.encode(menuBehavior, forKey: .menuBehavior)
+            }
+            if offersNewTerminal {
+                try container.encode(offersNewTerminal, forKey: .offersNewTerminal)
             }
         }
 
