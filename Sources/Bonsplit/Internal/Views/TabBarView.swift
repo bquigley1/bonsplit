@@ -1783,8 +1783,12 @@ struct TabBarView: View {
                         performSplitActionButton(button)
                     }
                 }
-                .accessibilityAction(named: Text(String(localized: "tabBar.showMenu", defaultValue: "Show Menu"))) {
-                    presentSplitActionMenu(button)
+                .accessibilityActions {
+                    if button.menuBehavior != .none {
+                        Button(String(localized: "tabBar.showMenu", defaultValue: "Show Menu")) {
+                            presentSplitActionMenu(button)
+                        }
+                    }
                 }
         } else if button.activatesOnMouseDown {
             splitActionButtonIcon(button.icon)
