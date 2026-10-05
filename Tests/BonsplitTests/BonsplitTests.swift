@@ -5540,11 +5540,9 @@ final class BonsplitTests: XCTestCase {
         }
     }
 
-    /// A tab bar wide enough to show the full action lane. Below
-    /// TabBarStyling.narrowPaneThreshold the tab bar collapses its actions into
-    /// one overflow button, so a test that samples the full lane's chrome must
-    /// render at least this wide.
-    private static let fullActionLaneWidth: CGFloat = TabBarStyling.narrowPaneThreshold + 80
+    /// A tab bar wide enough that the selected tab and the full action lane
+    /// both fit, so a test can sample the lane's chrome.
+    private static let fullActionLaneWidth: CGFloat = 600
 
     /// A selected-tab title long enough that its tab, capped at the bar's
     /// width, reaches under the full action lane.
@@ -5554,11 +5552,7 @@ final class BonsplitTests: XCTestCase {
     )
 
     private func visibleSplitButtonLaneWidth(size: NSSize, buttonCount: Int) -> CGFloat {
-        XCTAssertFalse(
-            TabBarStyling.isNarrowPane(width: size.width),
-            "A \(size.width)pt tab bar collapses its actions into one button; render at least fullActionLaneWidth to sample the full lane."
-        )
-        return TabBarLayout(
+        TabBarLayout(
             tabBarHeight: size.height,
             availableWidth: size.width,
             splitButtonCount: buttonCount,

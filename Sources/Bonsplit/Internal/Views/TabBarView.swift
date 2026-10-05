@@ -177,10 +177,6 @@ enum TabBarStyling {
     static let splitButtonsSpacing: CGFloat = 4
     static let splitButtonsLeadingPadding: CGFloat = 6
     static let splitButtonsTrailingPadding: CGFloat = 8
-    /// Below this width the individual action buttons consume the tab lane.
-    static let narrowPaneThreshold: CGFloat = 520
-    /// Width reserved by the single overflow button in a narrow pane.
-    static let collapsedActionLaneWidth: CGFloat = 36
 
     static var splitButtonsBackdropWidth: CGFloat {
         splitButtonsBackdropWidth(buttonCount: BonsplitConfiguration.SplitActionButton.defaults.count)
@@ -192,18 +188,6 @@ enum TabBarStyling {
             + splitButtonsTrailingPadding
             + (CGFloat(buttonCount) * splitActionButtonReservedWidth)
             + (CGFloat(max(0, buttonCount - 1)) * splitButtonsSpacing)
-    }
-
-    static func isNarrowPane(width: CGFloat) -> Bool {
-        width > 0 && width < narrowPaneThreshold
-    }
-
-    static func splitActionButtonCount(
-        isNarrowPane: Bool,
-        shouldShowSplitButtons: Bool,
-        visibleButtonCount: Int
-    ) -> Int {
-        isNarrowPane && shouldShowSplitButtons ? 1 : max(0, visibleButtonCount)
     }
 
     static func minimumVisibleSplitButtonLaneWidth(buttonCount: Int) -> CGFloat {
@@ -958,16 +942,11 @@ struct TabBarView: View {
     }
 
     private var tabBarLayout: TabBarLayout {
-        let actionButtonCount = TabBarStyling.splitActionButtonCount(
-            isNarrowPane: isNarrowPane,
-            shouldShowSplitButtons: shouldShowSplitButtons,
-            visibleButtonCount: visibleSplitButtons.count
-        )
-        return TabBarLayout(
+        TabBarLayout(
             tabBarHeight: appearance.tabBarHeight,
             availableWidth: containerWidth,
             tabContentWidthExcludingSplitButtonLane: tabContentWidthExcludingSplitButtonLane,
-            splitButtonCount: actionButtonCount,
+            splitButtonCount: visibleSplitButtons.count,
             splitButtonLaneVisible: shouldShowSplitButtons,
             reservesSplitButtonLane: splitButtonLane.reservesLane,
             measuredSplitButtonLaneWidth: measuredSplitButtonLaneWidth
@@ -987,10 +966,6 @@ struct TabBarView: View {
     private var visibleSplitButtons: [BonsplitConfiguration.SplitActionButton] {
         guard showSplitButtons else { return [] }
         return appearance.splitButtons
-    }
-
-    private var isNarrowPane: Bool {
-        TabBarStyling.isNarrowPane(width: containerWidth)
     }
 
     private var shouldRenderSplitButtons: Bool {
@@ -1524,13 +1499,7 @@ struct TabBarView: View {
     @ViewBuilder
     private var splitButtonChrome: some View {
         if shouldRenderSplitButtons {
-            Group {
-                if isNarrowPane {
-                    collapsedSplitButtonMenu
-                } else {
-                    splitButtons
-                }
-            }
+            splitButtons
                 .frame(width: splitButtonsBackdropWidth, height: tabBarHeight, alignment: .trailing)
                 .mask {
                     Rectangle()
@@ -1543,27 +1512,6 @@ struct TabBarView: View {
                 .frame(height: tabBarHeight, alignment: .trailing)
                 .tabBarButtonAnimationsDisabled()
         }
-    }
-
-    @ViewBuilder
-    private var collapsedSplitButtonMenu: some View {
-        Menu {
-            ForEach(visibleSplitButtons) { button in
-                Button {
-                    performSplitActionButton(button)
-                } label: {
-                    Text(splitActionButtonTooltip(button, tooltips: appearance.splitButtonTooltips))
-                }
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: TabBarStyling.collapsedActionLaneWidth, height: tabBarHeight)
-        }
-        .menuStyle(.borderlessButton)
-        .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "tabBar.moreActions", defaultValue: "More Tab Actions"))
-        .accessibilityIdentifier("paneTabBarControl.moreActions")
     }
 
     @ViewBuilder
