@@ -151,6 +151,61 @@ struct SplitActionButtonMenuTests {
         #expect(clicks == 0)
     }
 
+    @Test("Releasing outside the button does not click")
+    func releaseOutsideDoesNotClick() throws {
+        let (window, view) = makeHostedView(menuBehavior: .secondary)
+        defer { window.close() }
+        var clicks = 0
+        view.onClick = { _ in clicks += 1 }
+
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, in: view, modifiers: []))
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, in: view, modifiers: [], at: NSPoint(x: 60, y: 11)))
+
+        #expect(clicks == 0)
+        #expect(!view.isTrackingPress)
+    }
+
+    @Test("Holding opens the menu only while the pointer stays on the button")
+    func holdOpensMenuOnlyInside() throws {
+        let (window, view) = makeHostedView(menuBehavior: .secondary)
+        defer { window.close() }
+        var clicks = 0
+        var menuRequests = 0
+        var inside = false
+        view.onClick = { _ in clicks += 1 }
+        view.menuProvider = {
+            menuRequests += 1
+            return nil
+        }
+        view.isPointerInside = { inside }
+
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, in: view, modifiers: []))
+        view.holdToOpenMenuDelayElapsed()
+        #expect(menuRequests == 0)
+        #expect(view.isTrackingPress)
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, in: view, modifiers: [], at: NSPoint(x: 60, y: 11)))
+
+        inside = true
+        view.mouseDown(with: try mouseEvent(.leftMouseDown, in: view, modifiers: []))
+        view.holdToOpenMenuDelayElapsed()
+        #expect(menuRequests == 1)
+        #expect(!view.isTrackingPress)
+        view.mouseUp(with: try mouseEvent(.leftMouseUp, in: view, modifiers: []))
+
+        #expect(clicks == 0)
+    }
+
+    @Test("Menu anchors hold their views weakly")
+    func menuAnchorsAreWeak() {
+        let anchors = SplitActionMenuAnchors()
+        autoreleasepool {
+            let view = NSView()
+            anchors.set(view, for: "split")
+            #expect(anchors.view(for: "split") === view)
+        }
+        #expect(anchors.view(for: "split") == nil)
+    }
+
     private func makeHostedView(
         menuBehavior: ActionButton.MenuBehavior
     ) -> (NSWindow, SplitActionMenuInteractionNSView) {
@@ -170,12 +225,13 @@ struct SplitActionButtonMenuTests {
     private func mouseEvent(
         _ type: NSEvent.EventType,
         in view: NSView,
-        modifiers: NSEvent.ModifierFlags
+        modifiers: NSEvent.ModifierFlags,
+        at point: NSPoint = NSPoint(x: 11, y: 11)
     ) throws -> NSEvent {
         let window = try #require(view.window)
         return try #require(NSEvent.mouseEvent(
             with: type,
-            location: view.convert(NSPoint(x: 11, y: 11), to: nil),
+            location: view.convert(point, to: nil),
             modifierFlags: modifiers,
             timestamp: ProcessInfo.processInfo.systemUptime,
             windowNumber: window.windowNumber,

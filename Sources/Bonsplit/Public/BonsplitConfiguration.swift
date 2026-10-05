@@ -307,6 +307,8 @@ extension BonsplitConfiguration {
         public var icon: Icon
         public var tooltip: String?
         public var action: Action
+        /// Performs the action on mouse down. Ignored when the button has a
+        /// menu or an alternate action, which act on mouse up.
         public var activatesOnMouseDown: Bool
         /// Action performed when the button is clicked with the Option key held.
         /// When nil, Option-click performs ``action``.

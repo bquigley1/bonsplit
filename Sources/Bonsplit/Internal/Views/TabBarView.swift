@@ -913,6 +913,7 @@ struct TabBarView: View {
     @State private var splitButtonContentWidth: CGFloat = 0
     @State private var splitButtonViewportWidth: CGFloat = 0
     @State private var pressedSplitActionButtonId: String?
+    @State private var splitActionMenuAnchors = SplitActionMenuAnchors()
     @State private var controlKeyMonitor = TabControlShortcutKeyMonitor()
     @State private var tabItemGeometryRegistry = TabBarItemGeometryRegistry()
 
@@ -1550,14 +1551,33 @@ struct TabBarView: View {
     private var collapsedSplitButtonMenu: some View {
         Menu {
             ForEach(visibleSplitButtons) { button in
-                Button {
-                    if button.menuBehavior == .primary {
-                        presentSplitActionMenuAtMouseLocation(button)
-                    } else {
-                        performSplitActionButton(button)
+                let title = splitActionButtonTooltip(button, tooltips: appearance.splitButtonTooltips)
+                if button.menuBehavior == .primary {
+                    Button {
+                        presentSplitActionMenu(button)
+                    } label: {
+                        Text(title + "\u{2026}")
                     }
-                } label: {
-                    Text(splitActionButtonTooltip(button, tooltips: appearance.splitButtonTooltips))
+                } else {
+                    Button {
+                        performSplitActionButton(button)
+                    } label: {
+                        Text(title)
+                    }
+                    if let alternate = collapsedAlternateTitle(button) {
+                        Button {
+                            performSplitActionButton(button, optionKeyHeld: true)
+                        } label: {
+                            Text(alternate)
+                        }
+                    }
+                    if button.menuBehavior == .secondary {
+                        Button {
+                            presentSplitActionMenu(button)
+                        } label: {
+                            Text(title + "\u{2026}")
+                        }
+                    }
                 }
             }
         } label: {
@@ -1569,6 +1589,16 @@ struct TabBarView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(String(localized: "tabBar.moreActions", defaultValue: "More Tab Actions"))
         .accessibilityIdentifier("paneTabBarControl.moreActions")
+    }
+
+    /// Title of a button's Option-click action in the collapsed overflow menu,
+    /// nil when it has none or it matches the click action.
+    private func collapsedAlternateTitle(_ button: BonsplitConfiguration.SplitActionButton) -> String? {
+        guard let alternateAction = button.alternateAction, alternateAction != button.action else { return nil }
+        var alternate = button
+        alternate.action = alternateAction
+        alternate.tooltip = nil
+        return splitActionButtonTooltip(alternate, tooltips: appearance.splitButtonTooltips)
     }
 
     @ViewBuilder
@@ -1737,6 +1767,9 @@ struct TabBarView: View {
                         },
                         menuProvider: {
                             splitActionMenu(for: button)
+                        },
+                        onViewReady: { view in
+                            splitActionMenuAnchors.set(view, for: button.id)
                         }
                     )
                 )
@@ -1745,10 +1778,13 @@ struct TabBarView: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction {
                     if button.menuBehavior == .primary {
-                        presentSplitActionMenuAtMouseLocation(button)
+                        presentSplitActionMenu(button)
                     } else {
                         performSplitActionButton(button)
                     }
+                }
+                .accessibilityAction(named: Text(String(localized: "tabBar.showMenu", defaultValue: "Show Menu"))) {
+                    presentSplitActionMenu(button)
                 }
         } else if button.activatesOnMouseDown {
             splitActionButtonIcon(button.icon)
@@ -1892,13 +1928,21 @@ struct TabBarView: View {
         return controller.splitActionMenu(forButton: button.id, inPane: pane.id)
     }
 
-    /// Shows a button's menu at the pointer. Used where no anchor view exists:
-    /// the collapsed narrow-pane overflow menu and the accessibility action.
-    private func presentSplitActionMenuAtMouseLocation(_ button: BonsplitConfiguration.SplitActionButton) {
+    /// Shows a button's menu outside a pointer press: from the collapsed
+    /// narrow-pane overflow menu and from accessibility actions. Anchors under
+    /// the button when it is in a window; when the collapsed overflow
+    /// control is all that is shown (narrow panes), at the pointer.
+    private func presentSplitActionMenu(_ button: BonsplitConfiguration.SplitActionButton) {
         guard let menu = splitActionMenu(for: button) else { return }
+        let anchor = splitActionMenuAnchors.view(for: button.id)
         // Defer so a dismissing SwiftUI menu finishes its tracking loop first.
         Task { @MainActor in
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            if let anchor, anchor.window != nil, !anchor.isHiddenOrHasHiddenAncestor {
+                let point = NSPoint(x: anchor.bounds.minX, y: anchor.isFlipped ? anchor.bounds.maxY : anchor.bounds.minY)
+                menu.popUp(positioning: nil, at: point, in: anchor)
+            } else {
+                menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+            }
         }
     }
 
@@ -2141,10 +2185,12 @@ private struct SplitActionMenuInteractionOverlay: NSViewRepresentable {
     let onPressChanged: (Bool) -> Void
     let onClick: (Bool) -> Void
     let menuProvider: () -> NSMenu?
+    let onViewReady: (NSView) -> Void
 
     func makeNSView(context: Context) -> SplitActionMenuInteractionNSView {
         let view = SplitActionMenuInteractionNSView()
         update(view)
+        onViewReady(view)
         return view
     }
 
@@ -2157,6 +2203,21 @@ private struct SplitActionMenuInteractionOverlay: NSViewRepresentable {
         view.onPressChanged = onPressChanged
         view.onClick = onClick
         view.menuProvider = menuProvider
+    }
+}
+
+/// The on-screen view of each menu button, by button id, so menus opened
+/// without a pointer press (accessibility, narrow-pane overflow) anchor under
+/// their button. Weak, so a removed button never keeps its view alive.
+final class SplitActionMenuAnchors {
+    private let views = NSMapTable<NSString, NSView>.strongToWeakObjects()
+
+    func set(_ view: NSView, for id: String) {
+        views.setObject(view, forKey: id as NSString)
+    }
+
+    func view(for id: String) -> NSView? {
+        views.object(forKey: id as NSString)
     }
 }
 
@@ -2221,10 +2282,17 @@ final class SplitActionMenuInteractionNSView: NSView {
         }
     }
 
-    @objc private func holdToOpenMenuDelayElapsed() {
-        guard isTrackingPress else { return }
+    @objc func holdToOpenMenuDelayElapsed() {
+        guard isTrackingPress, isPointerInside() else { return }
         endPress()
         showMenu()
+    }
+
+    /// Whether the pointer is over the button; a press dragged off it opens no
+    /// menu. Replaceable so tests need not move the system pointer.
+    lazy var isPointerInside: () -> Bool = { [unowned self] in
+        guard let window else { return false }
+        return bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
     }
 
     private func cancelPendingHold() {
