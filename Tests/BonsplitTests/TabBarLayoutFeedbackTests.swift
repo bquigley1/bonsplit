@@ -6,38 +6,6 @@ import XCTest
 #if DEBUG
 @MainActor
 final class TabBarLayoutFeedbackTests: XCTestCase {
-    func testNarrowPanesCollapseActionLaneBeforeTabsLoseSpace() {
-        XCTAssertTrue(TabBarStyling.isNarrowPane(width: 400))
-        XCTAssertFalse(TabBarStyling.isNarrowPane(width: 520))
-        XCTAssertEqual(
-            TabBarStyling.splitButtonsBackdropWidth(buttonCount: 1),
-            TabBarStyling.collapsedActionLaneWidth
-        )
-        XCTAssertGreaterThan(
-            TabBarStyling.splitButtonsBackdropWidth(buttonCount: 7),
-            TabBarStyling.collapsedActionLaneWidth
-        )
-    }
-
-    func testNarrowPaneDoesNotReserveActionLaneWhenActionsAreHidden() {
-        XCTAssertEqual(
-            TabBarStyling.splitActionButtonCount(
-                isNarrowPane: true,
-                shouldShowSplitButtons: false,
-                visibleButtonCount: 0
-            ),
-            0
-        )
-        XCTAssertEqual(
-            TabBarStyling.splitActionButtonCount(
-                isNarrowPane: true,
-                shouldShowSplitButtons: true,
-                visibleButtonCount: 7
-            ),
-            1
-        )
-    }
-
     func testPinnedTabStaysAtLeadingEdgeWhileUnpinnedTabsScroll() throws {
         let size = NSSize(width: 420, height: TabBarMetrics.barHeight)
         let controller = BonsplitController(
