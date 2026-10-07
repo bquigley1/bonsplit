@@ -760,9 +760,9 @@ struct TabContextMenuState {
     let canCloseToRight: Bool
     let canCloseOthers: Bool
     /// Whether the pane has any browser tab, which shows Close All Browser Tabs.
-    var hasBrowserTabs: Bool = false
+    let hasBrowserTabs: Bool
     /// Whether the pane has an unpinned browser tab to close.
-    var canCloseBrowserTabs: Bool = false
+    let canCloseBrowserTabs: Bool
     let canMoveToNewWorkspace: Bool
     let canMoveToLeftPane: Bool
     let canMoveToRightPane: Bool
@@ -852,7 +852,7 @@ struct TabContextMenuState {
             && pane.tabs.enumerated().contains { itemIndex, item in
                 itemIndex != index && !item.isPinned
             }
-        let browserTabs = pane.tabs.filter { $0.kind == "browser" }
+        let browserTabs = pane.tabs.filter { $0.kind == TabItemStyling.browserTabKind }
         let canCloseBrowserTabs = allowsCloseTabs && browserTabs.contains(where: { !$0.isPinned })
         self.init(
             isPinned: tab.isPinned,
