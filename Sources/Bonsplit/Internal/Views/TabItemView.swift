@@ -1518,6 +1518,16 @@ enum TabContextMenuBuilder {
             target: target,
             to: menu
         )
+        if state.hasBrowserTabs {
+            addAction(
+                title: localized("tabContext.closeAllBrowserTabs", defaultValue: "Close All Browser Tabs"),
+                action: .closeBrowserTabs,
+                enabled: state.canCloseBrowserTabs,
+                state: state,
+                target: target,
+                to: menu
+            )
+        }
 
         menu.addItem(moveSubmenuItem(snapshot: snapshot, target: target))
 
@@ -1919,6 +1929,7 @@ enum TabContextMenuBuilder {
              .closeToLeft,
              .closeToRight,
              .closeOthers,
+             .closeBrowserTabs,
              .move,
              .moveToNewWorkspace,
              .moveToLeftPane,
